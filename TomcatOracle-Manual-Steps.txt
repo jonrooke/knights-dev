@@ -1,0 +1,126 @@
+TOMCAT/ORACLE MANUAL CONTAINER STEPS
+
+
+
+INSTALL SQLPLUS
+
+mkdir inst-sql
+
+mv in*11.2*zip inst-sql
+
+cd inst-sql
+
+unzip inst*basic*zip
+
+unzip inst*sql
+
+ln -s libclntsh.dylib.11.2 libclntsh.dylib
+
+rm libclntsh.dylib
+
+ln -s libclntsh.dylib.11.1 libclntsh.dylib
+
+ln -s libocci.dylib.11.1 libocci.dylib
+
+mkdir ~/lib/
+
+ln -s ./inst-sql/libsqlplus.dylib.11.1 ./inst-sql/libsqlplus.dylib
+
+ln -s libsqlplus.dylib.11.1 libsqlplus.dylib
+
+for i in lib*11.1; do cp $i ~/lib; done
+
+for i in lib*dylib; do cp $i ~/lib; done
+
+echo $PATH
+
+pwd
+
+export PATH=${pwd}:$PATH
+
+
+
+DOWNLOAD AND INSTALL SQL DEVELOPER
+
+https://www.oracle.com/technetwork/developer-tools/sql-developer/downloads/index.html
+
+
+
+CREATE DOCKER NETWORK
+
+sudo docker network create --driver=bridge --subnet=172.28.0.0/16 --ip-range=172.28.5.0/24  --gateway=172.28.5.254 dockernet
+
+
+
+RUN ORACLE IN CONTAINER
+
+docker run -d --name oracledb -p 8081:8080 -p 1521:1521 -v /Users/A343101/Desktop/IE-files/OracleSetup/dump:/etc/dump --network=dockernet --ip 172.28.5.124 howarddeiner/oracle-11g-ee:latest
+
+
+
+CONNECT TO THE DATABASE
+
+sqlplus system/oracle@//localhost:1521/EE.oracle.docker
+
+
+
+SETUP DATA FROM SQLPLUS PROMPT 
+
+1.	Execute startup.sql
+
+2.	Execute tablespace.sql
+
+3.	Execute user_role.sql
+
+4.	Execute missing_ddls.sql. (After next impdp step)
+
+
+
+5.	LAST STEP FROM CONTAINER
+
+impdp oracleadmin/welcome@localhost:1521/EE.oracle.docker directory=DUMP_DIR dumpfile=ods_prod_schema_only.dmp logfile=odsdump.log  transform=segment_attributes:n ignore=Y
+
+
+
+INCV APP SETUP
+
+1.	Execute incv_initial-setup.sql
+
+
+
+RUN TOMCAT IN CONTAINER
+
+docker run -d --rm --name inctest -v /Users/A343101/Desktop/IE-Files/incentivesweb/incentivesweb.war:/usr/local/tomcat/webapps/incentivesweb.war -p 8083:8080 --network=dockernet --ip 172.28.5.124 tomcat:7
+
+
+
+CHECK TOMCAT IS UP AND CONNECTING TO ORACLE
+
+http://localhost:8083/incentivesweb/ping.do
+
+
+
+LOOK FOR “SUCCESS” IN BROWSER
+
+
+
+ 
+
+NOTES
+
+1.	Incentivesweb.war needs to be copied to /usr/local/tomcat/webapps.  Tomcat will automatically explode war and use for build.
+
+2.	Review application logs in /usr/local/tomcat/logs to ensure that Tomcat comes up without errors.
+
+3.	Replace “oracle” db in /usr/local/tomcat/webapps/WEB-INF/classes/datasources.properties with ip for oracledb container (172.28.5.123 in this case).
+
+
+
+NEXT STEPS
+
+1.	Build Tomcat and Oracle containers from Dockerfiles.
+
+2.	Use Dockerfiles to automate builds from Github sources.
+
+3.	Enable automated software testing and Jenkins dashboard output.
+
